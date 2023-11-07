@@ -5,7 +5,10 @@ using System.Security.Claims;
 using System.Threading.Tasks;
 using API.DTOs;
 using API.Services;
+using Application.Activities;
 using Domain;
+using MediatR;
+using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
@@ -13,7 +16,7 @@ using Microsoft.EntityFrameworkCore;
 
 namespace API.Controllers
 {
-   
+
     [ApiController]
     [Route("api/[controller]")]
     public class AccountController : ControllerBase
@@ -26,7 +29,7 @@ namespace API.Controllers
             _userManager = userManager;
         }
 
- [AllowAnonymous] 
+        [AllowAnonymous]
         [HttpPost("login")]
         public async Task<ActionResult<UserDto>> Login(LoginDto loginDto)
         {
@@ -35,25 +38,27 @@ namespace API.Controllers
             var result = await _userManager.CheckPasswordAsync(user, loginDto.Password);
             if (result)
             {
-               return CreateUserObject(user);
+                return CreateUserObject(user);
             }
 
             return Unauthorized();
         }
 
- [AllowAnonymous] 
+        [AllowAnonymous]
         [HttpPost("register")]
         public async Task<ActionResult<UserDto>> Register(RegisterDto registerDto)
         {
             if (await _userManager.Users.AnyAsync(x => x.UserName == registerDto.Username))
             {
-                return BadRequest("Username is already taken");
+                ModelState.AddModelError("username", "Username is already taken");
+                return ValidationProblem();
             }
 
             if (await _userManager.Users.AnyAsync(x => x.Email == registerDto.Email))
             {
-                return BadRequest("Email is already taken");
-            }            
+                ModelState.AddModelError("email", "Email is already taken");
+                return ValidationProblem();
+            }
             var user = new AppUser
             {
                 DisplayName = registerDto.DisplayName,
@@ -72,7 +77,8 @@ namespace API.Controllers
 
         [Authorize]
         [HttpGet]
-        public async Task<ActionResult<UserDto>> GetCurrentUser(){
+        public async Task<ActionResult<UserDto>> GetCurrentUser()
+        {
             var user = await _userManager.FindByEmailAsync(User.FindFirstValue(ClaimTypes.Email));
 
             return CreateUserObject(user);
